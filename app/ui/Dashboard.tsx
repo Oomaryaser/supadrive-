@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabaseClient'
 import NavBar from '../components/NavBar'
 import FileCard, { type Item } from '../components/FileCard'
 import MoveToCollectionModal from '../components/MoveToCollectionModal'
-import { Trash2, AlertCircle } from 'lucide-react'
+import ShareModal from '../components/ShareModal'
+import { Trash2, AlertCircle, Share2 } from 'lucide-react'
 
 const BUCKET = 'drive'
 const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
@@ -68,6 +69,8 @@ export default function Dashboard({ userId }: DashboardProps) {
   const [moveOpen, setMoveOpen] = useState(false)
   const [collections, setCollections] = useState<Collection[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
   
   const pathPrefix = `public/${segments.join('/')}`.replace(/\/$/, '')
 
@@ -329,8 +332,8 @@ export default function Dashboard({ userId }: DashboardProps) {
     return files
   }, [supabase, showError])
 
-  const shareSelected = async (): Promise<void> => {
-    const selectedItems = items.filter(item => selected[item.path])
+  const shareSelected = async (override?: Item[]): Promise<void> => {
+    const selectedItems = override ?? items.filter(item => selected[item.path])
     if (selectedItems.length === 0) {
       showError('اختر ملفاً أو مجلداً واحداً على الأقل')
       return
@@ -391,12 +394,8 @@ export default function Dashboard({ userId }: DashboardProps) {
       }
 
       const url = `${window.location.origin}/s/${share.slug}`
-      try {
-        await navigator.clipboard.writeText(url)
-        alert('تم إنشاء رابط المشاركة ونسخه: ' + url)
-      } catch {
-        alert('تم إنشاء رابط المشاركة: ' + url + '\n(لم يتم نسخه تلقائياً)')
-      }
+      setShareUrl(url)
+      setShareOpen(true)
       setSelected({})
     } catch (error) {
       showError('خطأ غير متوقع في إنشاء المشاركة')
@@ -576,6 +575,7 @@ export default function Dashboard({ userId }: DashboardProps) {
                 selected={!!selected[item.path]}
                 toggle={() => setSelected(s => ({ ...s, [item.path]: !s[item.path] }))}
                 onOpen={onOpen}
+                onShare={(it) => shareSelected([it])}
               />
             ))}
           </div>
@@ -589,19 +589,28 @@ export default function Dashboard({ userId }: DashboardProps) {
             </div>
             <div className="divide-y divide-gray-700">
               {filtered.map(item => (
-                <div 
-                  key={item.path} 
+                <div
+                  key={item.path}
                   className="grid grid-cols-12 gap-4 items-center p-4 hover:bg-gray-700/50 transition-colors"
                 >
-                  <div 
-                    className="col-span-6 cursor-pointer hover:text-blue-400"
-                    onClick={() => onOpen(item)}
-                  >
-                    {item.name}
+                  <div className="col-span-6 flex items-center justify-between">
+                    <button
+                      className="text-left flex-1 cursor-pointer hover:text-blue-400"
+                      onClick={() => onOpen(item)}
+                    >
+                      {item.name}
+                    </button>
+                    <button
+                      className="opacity-80 ml-2"
+                      onClick={() => shareSelected([item])}
+                      title="مشاركة"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className="col-span-2 text-sm opacity-70">
-                    {item.type === 'file' && item.size ? 
-                      `${Math.round(item.size / 1024)} كيلوبايت` : 
+                    {item.type === 'file' && item.size ?
+                      `${Math.round(item.size / 1024)} كيلوبايت` :
                       item.type === 'folder' ? 'مجلد' : '-'
                     }
                   </div>
@@ -629,6 +638,11 @@ export default function Dashboard({ userId }: DashboardProps) {
         collections={collections}
         onCreate={createCollection}
         onConfirm={moveSelectedToCollection}
+      />
+      <ShareModal
+        open={shareOpen}
+        url={shareUrl}
+        onClose={() => setShareOpen(false)}
       />
     </div>
   )

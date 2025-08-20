@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
 
 type Item = { id: string, name: string, mimetype: string | null, size: number | null, path: string, publicUrl?: string }
@@ -11,6 +11,8 @@ const BUCKET = 'drive'
 
 export default function SharePage() {
   const { slug } = useParams<{ slug: string }>()
+  const search = useSearchParams()
+  const canEdit = search.get('mode') === 'edit'
   const supabase = useMemo(()=>createClient(), [])
   const [share, setShare] = useState<Share|null>(null)
   const [items, setItems] = useState<Item[]>([])
@@ -78,6 +80,11 @@ export default function SharePage() {
             <div className="text-sm opacity-70">مشاركة</div>
             <h1 className="text-3xl md:text-4xl font-bold">{share.title || 'الملفات المشتركة'}</h1>
             {share.subtitle && <p className="opacity-80">{share.subtitle}</p>}
+            {canEdit ? (
+              <div className="text-sm text-green-400">لديك صلاحية التعديل</div>
+            ) : (
+              <div className="text-sm opacity-70">معاينة فقط</div>
+            )}
             {share.cta_label && share.cta_url && (
               <a href={share.cta_url} target="_blank" className="btn btn-primary inline-block">{share.cta_label}</a>
             )}
