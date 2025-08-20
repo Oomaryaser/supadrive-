@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0d10;
+  --card: #111418;
+}
+
+html, body, #__next { height: 100%; }
+body { background: var(--bg); color: #e9eef5; }
+.container { max-width: 1200px; }
+.card { background: var(--card); border-radius: 1rem; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
+.btn { @apply inline-flex items-center gap-2 rounded-xl px-4 py-2 transition; background:#1c222b; }
+.btn:hover { background:#212a35; }
+.btn-primary { background:#2563eb; }
+.btn-primary:hover { background:#1d4ed8; }
+.input { @apply w-full rounded-xl px-3 py-2 text-black; }
+.badge { @apply text-xs px-2 py-0.5 rounded bg-gray-700; }
+.row { @apply grid grid-cols-12 gap-4; }
+
+/* Grid helpers */
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.thumb { @apply rounded-lg overflow-hidden bg-black/30; aspect-ratio: 4/3; display:flex; align-items:center; justify-content:center; }
+.thumb img, .thumb video, .thumb iframe { width: 100%; height: 100%; object-fit: cover; }
+
+/* Share banner */
+.share-hero {
+  background: radial-gradient(80% 80% at 50% 20%, rgba(37,99,235,.3), transparent 70%);
+  border: 1px solid rgba(255,255,255,.06);
+}
