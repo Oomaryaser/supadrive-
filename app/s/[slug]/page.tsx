@@ -23,7 +23,7 @@ export default function SharePage() {
       if (!s) { setLoading(false); return }
       const { data: its } = await supabase
         .from('collection_items')
-        .select('id,name,mimetype,size,path,collections!inner(id),collections(id,shares!inner(slug))')
+        .select('id,name,mimetype,size,path,collections!inner(id,shares!inner(slug))')
         .eq('collections.shares.slug', slug)
       const items = (its||[]).map((r:any)=>({ id: r.id, name: r.name, mimetype: r.mimetype, size: r.size, path: r.path }))
       // public urls
