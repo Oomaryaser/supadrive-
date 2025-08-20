@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
 
-type Item = { id: string, name: string, mimetype: string|null, size: number|null, path: string, publicUrl?: string }
-type Share = { id: string, slug: string, title: string|null, subtitle: string|null, banner_image_url: string|null, cta_label: string|null, cta_url: string|null }
+type Item = { id: string, name: string, mimetype: string | null, size: number | null, path: string, publicUrl?: string }
+type Share = { id: string, slug: string, title: string | null, subtitle: string | null, banner_image_url: string | null, cta_label: string | null, cta_url: string | null }
+type DisplayItem = { id: string, name: string, type: 'folder' } | (Item & { type: 'file' })
 
 const BUCKET = 'drive'
 
@@ -13,6 +14,7 @@ export default function SharePage() {
   const supabase = useMemo(()=>createClient(), [])
   const [share, setShare] = useState<Share|null>(null)
   const [items, setItems] = useState<Item[]>([])
+  const [segments, setSegments] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,6 +38,34 @@ export default function SharePage() {
     }
     load()
   }, [slug, supabase])
+
+  const currentPath = segments.join('/')
+  const displayItems = useMemo((): DisplayItem[] => {
+    const prefix = currentPath ? currentPath + '/' : ''
+    const folders = new Set<string>()
+    const files: DisplayItem[] = []
+    for (const it of items) {
+      const rel = it.path.replace(/^public\//, '')
+      if (!rel.startsWith(prefix)) continue
+      const rest = rel.slice(prefix.length)
+      const idx = rest.indexOf('/')
+      if (idx === -1) {
+        files.push({ ...it, type: 'file' })
+      } else {
+        folders.add(rest.slice(0, idx))
+      }
+    }
+    const folderItems: DisplayItem[] = Array.from(folders).map(name => ({ id: name, name, type: 'folder' }))
+    return [...folderItems, ...files]
+  }, [items, currentPath])
+
+  const onOpen = (item: DisplayItem) => {
+    if (item.type === 'folder') {
+      setSegments(prev => [...prev, item.name])
+    } else if (item.publicUrl) {
+      window.open(item.publicUrl, '_blank')
+    }
+  }
 
   if (loading) return <div className="container mx-auto p-6">...جاري التحميل</div>
   if (!share) return <div className="container mx-auto p-6">الرابط غير موجود أو انتهت صلاحيته.</div>
@@ -63,11 +93,20 @@ export default function SharePage() {
       </section>
 
       <main className="container mx-auto p-6">
+        {segments.length > 0 && (
+          <div className="mb-4 text-sm">
+            <button onClick={() => setSegments(prev => prev.slice(0, -1))} className="underline">رجوع</button>
+          </div>
+        )}
         <div className="grid-auto">
-          {items.map(it => (
-            <a key={it.id} href={it.publicUrl} target="_blank" className="p-2 rounded-lg hover:bg-gray-800/40 border border-transparent hover:border-gray-700">
+          {displayItems.map(it => (
+            <div key={it.id} onClick={() => onOpen(it)} className="p-2 rounded-lg hover:bg-gray-800/40 border border-transparent hover:border-gray-700 cursor-pointer">
               <div className="thumb">
-                {it.mimetype?.startsWith('image/') ? (
+                {it.type === 'folder' ? (
+                  <div className="grid place-items-center">
+                    <div className="text-5xl">📁</div>
+                  </div>
+                ) : it.mimetype?.startsWith('image/') ? (
                   <img src={it.publicUrl} alt={it.name} />
                 ) : it.mimetype?.startsWith('video/') ? (
                   <video src={it.publicUrl} muted />
@@ -78,8 +117,10 @@ export default function SharePage() {
                 )}
               </div>
               <div className="mt-2 text-sm truncate" title={it.name}>{it.name}</div>
-              <div className="text-xs opacity-60">{it.size ? Math.round((it.size||0)/1024)+' KB' : ''}</div>
-            </a>
+              {it.type === 'file' && (
+                <div className="text-xs opacity-60">{it.size ? Math.round((it.size || 0) / 1024) + ' KB' : ''}</div>
+              )}
+            </div>
           ))}
         </div>
       </main>
