@@ -2,9 +2,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
+import { Download, Trash2, Upload } from 'lucide-react'
+import { saveAs } from 'file-saver'
+import JSZip from 'jszip'
 
 type Item = { id: string, name: string, mimetype: string | null, size: number | null, path: string, publicUrl?: string }
-type Share = { id: string, slug: string, title: string | null, subtitle: string | null, banner_image_url: string | null, cta_label: string | null, cta_url: string | null }
+type Share = { id: string, slug: string, collection_id: string, title: string | null, subtitle: string | null, banner_image_url: string | null, cta_label: string | null, cta_url: string | null }
 type DisplayItem = { id: string, name: string, type: 'folder' } | (Item & { type: 'file' })
 
 const BUCKET = 'drive'
@@ -27,8 +30,8 @@ export default function SharePage() {
       if (!s) { setLoading(false); return }
       const { data: its } = await supabase
         .from('collection_items')
-        .select('id,name,mimetype,size,path,collections!inner(id,shares!inner(slug))')
-        .eq('collections.shares.slug', slug)
+        .select('id,name,mimetype,size,path')
+        .eq('collection_id', (s as any).collection_id)
       const items = (its||[]).map((r:any)=>({ id: r.id, name: r.name, mimetype: r.mimetype, size: r.size, path: r.path }))
       // public urls
       const withUrl = items.map((i:any)=> {
@@ -69,6 +72,72 @@ export default function SharePage() {
     }
   }
 
+  const downloadItem = async (item: DisplayItem) => {
+    if (item.type === 'file' && item.publicUrl) {
+      const res = await fetch(item.publicUrl)
+      const blob = await res.blob()
+      saveAs(blob, item.name)
+    } else if (item.type === 'folder') {
+      const prefix = (currentPath ? currentPath + '/' : '') + item.name + '/'
+      const folderFiles = items.filter(f => f.path.replace(/^public\//, '').startsWith(prefix))
+      const zip = new JSZip()
+      for (const f of folderFiles) {
+        if (!f.publicUrl) continue
+        const res = await fetch(f.publicUrl)
+        const blob = await res.blob()
+        const rel = f.path.replace(/^public\//, '').slice(prefix.length)
+        zip.file(rel, blob)
+      }
+      const content = await zip.generateAsync({ type: 'blob' })
+      saveAs(content, item.name + '.zip')
+    }
+  }
+
+  const deleteItem = async (item: DisplayItem) => {
+    if (!canEdit) return
+    if (!confirm('هل أنت متأكد من الحذف؟')) return
+    if (item.type === 'file') {
+      await supabase.storage.from(BUCKET).remove([item.path])
+      await supabase.from('collection_items').delete().eq('id', item.id)
+      setItems(prev => prev.filter(i => i.id !== item.id))
+    } else {
+      const prefix = 'public/' + (currentPath ? currentPath + '/' : '') + item.name
+      const targets = items.filter(i => i.path.startsWith(prefix))
+      await supabase.storage.from(BUCKET).remove(targets.map(t => t.path))
+      await supabase.from('collection_items').delete().in('id', targets.map(t => t.id))
+      setItems(prev => prev.filter(i => !i.path.startsWith(prefix)))
+    }
+  }
+
+  const uploadFiles = () => {
+    if (!canEdit || !share) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.onchange = async () => {
+      if (!input.files?.length) return
+      const files = Array.from(input.files)
+      for (const file of files) {
+        const target = 'public/' + (currentPath ? currentPath + '/' : '') + file.name
+        await supabase.storage.from(BUCKET).upload(target, file, { upsert: true })
+        const { data: inserted } = await supabase
+          .from('collection_items')
+          .insert({
+            collection_id: (share as any).collection_id,
+            path: target,
+            name: file.name,
+            mimetype: file.type,
+            size: file.size
+          })
+          .select('id')
+          .single()
+        const { data } = supabase.storage.from(BUCKET).getPublicUrl(target)
+        setItems(prev => [...prev, { id: inserted?.id || '', name: file.name, mimetype: file.type, size: file.size, path: target, publicUrl: data.publicUrl }])
+      }
+    }
+    input.click()
+  }
+
   if (loading) return <div className="container mx-auto p-6">...جاري التحميل</div>
   if (!share) return <div className="container mx-auto p-6">الرابط غير موجود أو انتهت صلاحيته.</div>
 
@@ -105,6 +174,11 @@ export default function SharePage() {
             <button onClick={() => setSegments(prev => prev.slice(0, -1))} className="underline">رجوع</button>
           </div>
         )}
+        {canEdit && (
+          <div className="mb-4">
+            <button onClick={uploadFiles} className="btn"><Upload className="w-4 h-4 inline mr-1"/>رفع ملفات</button>
+          </div>
+        )}
         <div className="grid-auto">
           {displayItems.map(it => (
             <div key={it.id} onClick={() => onOpen(it)} className="p-2 rounded-lg hover:bg-gray-800/40 border border-transparent hover:border-gray-700 cursor-pointer">
@@ -123,7 +197,13 @@ export default function SharePage() {
                   </div>
                 )}
               </div>
-              <div className="mt-2 text-sm truncate" title={it.name}>{it.name}</div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="text-sm truncate" title={it.name}>{it.name}</div>
+                <div className="flex items-center gap-1">
+                  <button onClick={e=>{e.stopPropagation(); downloadItem(it)}} className="btn" title="تحميل"><Download className="w-4 h-4"/></button>
+                  {canEdit && <button onClick={e=>{e.stopPropagation(); deleteItem(it)}} className="btn" title="حذف"><Trash2 className="w-4 h-4"/></button>}
+                </div>
+              </div>
               {it.type === 'file' && (
                 <div className="text-xs opacity-60">{it.size ? Math.round((it.size || 0) / 1024) + ' KB' : ''}</div>
               )}
