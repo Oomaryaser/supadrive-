@@ -7,7 +7,17 @@ import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
 
 type Item = { id: string, name: string, mimetype: string | null, size: number | null, path: string, publicUrl?: string }
-type Share = { id: string, slug: string, collection_id: string, title: string | null, subtitle: string | null, banner_image_url: string | null, cta_label: string | null, cta_url: string | null }
+type Share = {
+  id: string,
+  slug: string,
+  collection_id: string,
+  title: string | null,
+  subtitle: string | null,
+  banner_image_url: string | null,
+  bottom_image_url: string | null,
+  cta_label: string | null,
+  cta_url: string | null
+}
 type DisplayItem = { id: string, name: string, type: 'folder' } | (Item & { type: 'file' })
 
 const BUCKET = 'drive'
@@ -147,7 +157,7 @@ export default function SharePage() {
         <div className="container mx-auto p-6 grid md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-7 space-y-3">
             <div className="text-sm opacity-70">مشاركة</div>
-            <h1 className="text-3xl md:text-4xl font-bold">{share.title || 'الملفات المشتركة'}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold">{share.title || ''}</h1>
             {share.subtitle && <p className="opacity-80">{share.subtitle}</p>}
             {canEdit ? (
               <div className="text-sm text-green-400">لديك صلاحية التعديل</div>
@@ -211,6 +221,11 @@ export default function SharePage() {
           ))}
         </div>
       </main>
+      {share.bottom_image_url && (
+        <div className="container mx-auto p-6">
+          <img src={share.bottom_image_url} alt="bottom" className="w-full object-cover rounded-xl" />
+        </div>
+      )}
     </div>
   )
 }
