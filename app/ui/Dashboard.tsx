@@ -20,8 +20,7 @@ type Collection = {
   created_at?: string
 }
 
-type ShareResp = { 
-  url: string
+type ShareResp = {
   slug: string
 }
 
@@ -339,9 +338,10 @@ export default function Dashboard({ userId }: DashboardProps) {
 
       // Create public share
       const { data: share, error: sErr } = await supabase
-        .rpc('create_share_for_collection', { p_collection_id: collId }) as unknown as { data: ShareResp, error: any }
-      if (sErr) {
-        showError('خطأ في إنشاء رابط المشاركة: ' + sErr.message)
+        .rpc('create_share_for_collection', { p_collection_id: collId })
+        .single<ShareResp>()
+      if (sErr || !share?.slug) {
+        showError('خطأ في إنشاء رابط المشاركة' + (sErr ? ': ' + sErr.message : ''))
         return
       }
 
