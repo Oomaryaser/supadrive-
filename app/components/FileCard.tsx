@@ -1,5 +1,5 @@
 'use client'
-import { File, Folder, CheckSquare, Square } from 'lucide-react'
+import { File, Folder, CheckSquare, Square, Share2 } from 'lucide-react'
 
 export type Item = {
   id: string
@@ -13,9 +13,9 @@ export type Item = {
 }
 
 export default function FileCard({
-  item, selected, toggle, onOpen
+  item, selected, toggle, onOpen, onShare
 }: {
-  item: Item, selected: boolean, toggle: ()=>void, onOpen: (it: Item)=>void
+  item: Item, selected: boolean, toggle: ()=>void, onOpen: (it: Item)=>void, onShare: (it: Item)=>void
 }) {
   const isImg = !!item.mimetype?.startsWith('image/')
   const isVid = !!item.mimetype?.startsWith('video/')
@@ -34,9 +34,14 @@ export default function FileCard({
       </div>
       <div className="flex items-center justify-between gap-2 mt-2">
         <button className="text-left text-sm truncate hover:underline" title={item.name} onClick={()=>onOpen(item)}>{item.name}</button>
-        <button className="opacity-80" onClick={toggle} title="تحديد">
-          {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <button className="opacity-80" onClick={()=>onShare(item)} title="مشاركة">
+            <Share2 className="w-4 h-4" />
+          </button>
+          <button className="opacity-80" onClick={toggle} title="تحديد">
+            {selected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
       <div className="text-xs opacity-60 mt-1">{item.type==='file' && item.size ? Math.round(item.size/1024)+' KB' : ''}</div>
     </div>
