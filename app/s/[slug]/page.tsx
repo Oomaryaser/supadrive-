@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, ChangeEvent } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabaseClient'
 import { Download, Trash2, Upload } from 'lucide-react'
@@ -7,7 +7,17 @@ import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
 
 type Item = { id: string, name: string, mimetype: string | null, size: number | null, path: string, publicUrl?: string }
-type Share = { id: string, slug: string, collection_id: string, title: string | null, subtitle: string | null, banner_image_url: string | null, cta_label: string | null, cta_url: string | null }
+type Share = {
+  id: string,
+  slug: string,
+  collection_id: string,
+  title: string | null,
+  subtitle: string | null,
+  banner_image_url: string | null,
+  bottom_image_url: string | null,
+  cta_label: string | null,
+  cta_url: string | null
+}
 type DisplayItem = { id: string, name: string, type: 'folder' } | (Item & { type: 'file' })
 
 const BUCKET = 'drive'
@@ -21,6 +31,7 @@ export default function SharePage() {
   const [items, setItems] = useState<Item[]>([])
   const [segments, setSegments] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [titleInput, setTitleInput] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +54,10 @@ export default function SharePage() {
     }
     load()
   }, [slug, supabase])
+
+  useEffect(() => {
+    setTitleInput(share?.title || '')
+  }, [share])
 
   const currentPath = segments.join('/')
   const displayItems = useMemo((): DisplayItem[] => {
@@ -138,6 +153,34 @@ export default function SharePage() {
     input.click()
   }
 
+  const updateShare = async (fields: Partial<Share>) => {
+    if (!share) return
+    const { data, error } = await supabase.from('shares').update(fields).eq('id', share.id).select().single()
+    if (!error && data) setShare(data as Share)
+  }
+
+  const saveTitle = async () => {
+    await updateShare({ title: titleInput })
+  }
+
+  const uploadImage = async (file: File, field: 'banner_image_url' | 'bottom_image_url') => {
+    if (!share) return
+    const target = `public/${share.slug}-${field}-${file.name}`
+    await supabase.storage.from(BUCKET).upload(target, file, { upsert: true })
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(target)
+    await updateShare({ [field]: data.publicUrl } as any)
+  }
+
+  const onBannerChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadImage(file, 'banner_image_url')
+  }
+
+  const onBottomChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadImage(file, 'bottom_image_url')
+  }
+
   if (loading) return <div className="container mx-auto p-6">...جاري التحميل</div>
   if (!share) return <div className="container mx-auto p-6">الرابط غير موجود أو انتهت صلاحيته.</div>
 
@@ -147,7 +190,7 @@ export default function SharePage() {
         <div className="container mx-auto p-6 grid md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-7 space-y-3">
             <div className="text-sm opacity-70">مشاركة</div>
-            <h1 className="text-3xl md:text-4xl font-bold">{share.title || 'الملفات المشتركة'}</h1>
+            <h1 className="text-3xl md:text-4xl font-bold">{share.title || ''}</h1>
             {share.subtitle && <p className="opacity-80">{share.subtitle}</p>}
             {canEdit ? (
               <div className="text-sm text-green-400">لديك صلاحية التعديل</div>
@@ -169,6 +212,23 @@ export default function SharePage() {
       </section>
 
       <main className="container mx-auto p-6">
+        {canEdit && (
+          <div className="mb-8 space-y-4">
+            <div>
+              <label className="block mb-1 text-sm">العنوان الرئيسي</label>
+              <input className="input w-full" value={titleInput} onChange={e => setTitleInput(e.target.value)} />
+              <button onClick={saveTitle} className="btn mt-2">حفظ</button>
+            </div>
+            <div>
+              <label className="block mb-1 text-sm">الصورة الإعلانية</label>
+              <input type="file" accept="image/*" onChange={onBannerChange} />
+            </div>
+            <div>
+              <label className="block mb-1 text-sm">صورة أسفل الصفحة</label>
+              <input type="file" accept="image/*" onChange={onBottomChange} />
+            </div>
+          </div>
+        )}
         {segments.length > 0 && (
           <div className="mb-4 text-sm">
             <button onClick={() => setSegments(prev => prev.slice(0, -1))} className="underline">رجوع</button>
@@ -211,6 +271,11 @@ export default function SharePage() {
           ))}
         </div>
       </main>
+      {share.bottom_image_url && (
+        <div className="container mx-auto p-6">
+          <img src={share.bottom_image_url} alt="bottom" className="w-full object-cover rounded-xl" />
+        </div>
+      )}
     </div>
   )
 }

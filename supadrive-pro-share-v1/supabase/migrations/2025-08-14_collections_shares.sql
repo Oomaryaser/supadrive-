@@ -6,6 +6,7 @@ create table if not exists public.collections (
   title text null,
   subtitle text null,
   banner_image_url text null,
+  bottom_image_url text null,
   cta_label text null,
   cta_url text null,
   created_at timestamp with time zone default now()
@@ -30,6 +31,7 @@ create table if not exists public.shares (
   title text null,
   subtitle text null,
   banner_image_url text null,
+  bottom_image_url text null,
   cta_label text null,
   cta_url text null,
   created_at timestamp with time zone default now()
@@ -88,4 +90,10 @@ with check (true);
 create policy if not exists "insert shares any"
 on public.shares for insert
 to authenticated, anon
+with check (true);
+
+create policy if not exists "update shares any"
+on public.shares for update
+to authenticated, anon
+using (true)
 with check (true);
