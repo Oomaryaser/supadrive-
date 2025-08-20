@@ -298,18 +298,63 @@ export default function Dashboard({ userId }: DashboardProps) {
     }
   }
 
+  const listAllFiles = useCallback(async (prefix: string): Promise<Item[]> => {
+    const { data, error } = await supabase.storage.from(BUCKET).list(prefix, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' }
+    })
+    if (error) {
+      console.error('خطأ في تحميل محتويات المجلد:', error)
+      showError('خطأ في تحميل محتويات المجلد')
+      return []
+    }
+    const files: Item[] = []
+    for (const d of data || []) {
+      const fullPath = `${prefix}${d.name}`.replace(/\/$/, '')
+      if (d.metadata) {
+        files.push({
+          id: d.id || d.name,
+          type: 'file',
+          name: d.name,
+          size: d.metadata.size,
+          mimetype: d.metadata.mimetype,
+          updated_at: d.updated_at,
+          path: fullPath
+        })
+      } else {
+        const sub = await listAllFiles(fullPath + '/')
+        files.push(...sub)
+      }
+    }
+    return files
+  }, [supabase, showError])
+
   const shareSelected = async (): Promise<void> => {
-    const selectedItems = items.filter(item => selected[item.path] && item.type === 'file')
+    const selectedItems = items.filter(item => selected[item.path])
     if (selectedItems.length === 0) {
-      showError('اختر ملفاً واحداً على الأقل')
+      showError('اختر ملفاً أو مجلداً واحداً على الأقل')
       return
     }
     if (!requireAuth()) return
     try {
+      let files: Item[] = []
+      for (const item of selectedItems) {
+        if (item.type === 'file') {
+          files.push(item)
+        } else {
+          const sub = await listAllFiles(item.path + '/')
+          files.push(...sub)
+        }
+      }
+      if (files.length === 0) {
+        showError('المجلدات المختارة فارغة')
+        return
+      }
+
       // Create collection
       const { data: coll, error: cErr } = await supabase
         .from('collections')
-        .insert({ 
+        .insert({
           name: `مشاركة - ${new Date().toLocaleDateString('ar')}`,
           user_id: authUserId
         })
@@ -322,7 +367,7 @@ export default function Dashboard({ userId }: DashboardProps) {
       const collId = (coll as any).id as string
 
       // Add items to collection
-      const payload = selectedItems.map(item => ({
+      const payload = files.map(item => ({
         collection_id: collId,
         path: item.path,
         name: item.name,
