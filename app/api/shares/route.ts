@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
   if (error || !data?.slug) {
     return NextResponse.json({ error: error?.message || 'slug missing' }, { status: 500 })
   }
-  const url = `${process.env.NEXT_PUBLIC_SITE_URL || ''}/s/${data.slug}`
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin
+  const url = `${origin}/s/${data.slug}`
   return NextResponse.json({ slug: data.slug, url })
 }
