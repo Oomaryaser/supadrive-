@@ -393,7 +393,8 @@ export default function Dashboard({ userId }: DashboardProps) {
         return
       }
 
-      const url = `${window.location.origin}/s/${share.slug}`
+      const base = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin
+      const url = `${base}/s/${share.slug}`
       setShareUrl(url)
       setShareOpen(true)
       setSelected({})
