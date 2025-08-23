@@ -65,7 +65,7 @@ export default function RegisterPage() {
           </form>
         )}
         <p className="text-sm opacity-80">
-          لديك حساب؟ <Link className="link" href="/login">سجّل الدخول</Link>
+          لديك حساب؟ <a className="link" href="/login">سجّل الدخول</a>
         </p>
       </div>
     </div>
