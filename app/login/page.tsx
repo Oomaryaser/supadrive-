@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
@@ -72,7 +73,7 @@ export default function LoginPage() {
           </form>
         )}
         <p className="text-sm opacity-80">
-          لا تملك حساباً؟ <a className="link" href="/register">سجّل الآن</a>
+          لا تملك حساباً؟ <Link className="link" href="/register">سجّل الآن</Link>
         </p>
       </div>
     </div>
